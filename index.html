@@ -28,10 +28,9 @@
           console.log('created model', m);
           var compressed = loader.compress(parsedShp);
           //save(compressed.buffer, '110m_land.i16a')
-          console.log('16-bit quantized size', compressed.buffer.byteLength);
           var n = loader.loadCompressed(compressed, true);
           var r = new THREE.WebGLRenderer();
-          r.setSize(500,500);
+          r.setSize(1400,1400);
           document.body.appendChild(r.domElement);
           var s = new THREE.Scene();
           s.add(m);
@@ -44,9 +43,8 @@
           var animate = function(t) {
             var dt = t-t0;
             t0 = t;
-            m.rotation.y += 0.002 * dt;
-            n.rotation.y += 0.002 * dt;
-            m.position.y = Math.abs(Math.sin(t / 500)) * 200 - 100;
+            m.rotation.y += 0.0001 * dt;
+            n.rotation.y += 0.0001 * dt;
             c.lookAt(new THREE.Vector3(0,0,0));
             r.render(s, c);
             requestAnimationFrame(animate);

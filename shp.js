@@ -162,10 +162,10 @@ p.createModel = function(shp, spherize) {
           }
         }
         if (false && r.type == SHP.POLYGON) {
-          console.log('new polygon', poly.length, points.length/2);
+          //console.log('new polygon', poly.length, points.length/2);
           polys.push(new THREE.ExtrudeGeometry(new THREE.Shape(poly), {amount: 0}));
         } else {
-          console.log('new polyline', poly.length, points.length/2);
+          //console.log('new polyline', poly.length, points.length/2);
           var geo = new THREE.Geometry();
           geo.vertices = poly;
           lines.push(geo);
@@ -191,13 +191,13 @@ p.createModel = function(shp, spherize) {
   return model;
 };
 
-p.loadCompressed = function(compressed, spherize) {
+p.loadCompressed = function(deltaEncoded, spherize) {
+  var compressed = this.deltaDecode(deltaEncoded);
   var polys = [];
   var lines = [];
   var poly = [];
   for (var i=0; i<compressed.length; i++) {
     if (compressed[i] === -32768) {
-      console.log('new polyline', poly.length);
       var geo = new THREE.Geometry();
       geo.vertices = poly;
       lines.push(geo);
@@ -222,7 +222,7 @@ p.loadCompressed = function(compressed, spherize) {
   for (var i=0; i<lines.length; i++) {
     model.add(new THREE.Line(
       lines[i],
-      new THREE.LineBasicMaterial({color: 'black', lineWidth: 2}),
+      new THREE.LineBasicMaterial({color: 0xFF0000, lineWidth: 2}),
       THREE.LineStrip
     ));
   }
@@ -254,6 +254,97 @@ p.compress = function(shp) {
     }
   }
   var i16a = new Int16Array(polys);
-  console.log(polys, i16a);
-  return i16a;
+  console.log('16-bit quantized byteLength', i16a.buffer.byteLength);
+  var denc = this.deltaEncode(i16a);
+  console.log('delta-encoded byteLength', denc.byteLength);
+  return denc;
+};
+
+p.deltaEncode = function(arr) {
+  var polys = [];
+  var spans = [];
+  var span = [];
+  var x = 0, y = 0;
+  var byteLen = 0;
+  for (var i=0; i<arr.length; i++) {
+    if (arr[i] == -32768) {
+      spans.push(span);
+      polys.push(spans);
+      spans = [];
+      span = [];
+      byteLen += 3;
+      continue;
+    }
+    if (span.length == 0) {
+      x = arr[i], y = arr[i+1];
+      span.push(x, y);
+      byteLen += 4;
+      i++;
+    } else if (Math.abs(x - arr[i]) > 1023 || Math.abs(y - arr[i+1]) > 1023) {
+      spans.push(span);
+      byteLen += 1;
+      span = [];
+      x = arr[i], y = arr[i+1];
+      span.push(x, y);
+      byteLen += 4;
+      i++;
+    } else {
+      span.push((arr[i] - x) / 8, (arr[i+1] - y) / 8);
+      x += (((arr[i] - x) / 8) | 0) * 8;
+      y += (((arr[i+1] - y) / 8) | 0) * 8;
+      byteLen += 2;
+      i++;
+    }
+  }
+  var buf = new ArrayBuffer(byteLen);
+  var dv = new DataView(buf);
+  var idx = 0;
+  for (var i=0; i<polys.length; i++) {
+    var spans = polys[i];
+    for (var j=0; j<spans.length; j++) {
+      var span = spans[j];
+      dv.setInt16(idx, span[0]);
+      idx += 2;
+      dv.setInt16(idx, span[1]);
+      idx += 2;
+      for (var k=2; k<span.length; k++) {
+        dv.setInt8(idx++, span[k]);
+      }
+      dv.setInt8(idx, -128);
+      idx += 1;
+    }
+    dv.setInt16(idx, -32768);
+    idx += 2;
+  }
+  return buf;
+};
+
+p.deltaDecode = function(buf) {
+  var dv = new DataView(buf);
+  var idx = 0;
+  var polys = [];
+  while (idx < buf.byteLength) {
+    var x = dv.getInt16(idx);
+    idx += 2;
+    if (x === -32768) {
+      polys.push(-32768);
+      continue;
+    }
+    var y = dv.getInt16(idx);
+    idx += 2;
+    polys.push(x, y);
+    while (idx < buf.byteLength) {
+      var dx = dv.getInt8(idx);
+      idx++;
+      if (dx == -128) {
+        break;
+      }
+      var dy = dv.getInt8(idx);
+      idx++;
+      x += dx * 8;
+      y += dy * 8;
+      polys.push(x, y);
+    }
+  }
+  return polys;
 };
