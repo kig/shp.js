@@ -159,10 +159,10 @@ p.createModel = function(shp, spherize) {
             var z = Math.sin(a) * 90 * Math.cos(t);
             poly.push(new THREE.Vector3(x, y, z));
           } else {
-            poly.push(new THREE.Vector2(x, y));
+            poly.push(new THREE.Vector3(x, y, 0));
           }
         }
-        if (false &&r.type == SHP.POLYGON) {
+        if (false && r.type == SHP.POLYGON) {
           console.log('new polygon', poly.length, points.length/2);
           polys.push(new THREE.ExtrudeGeometry(new THREE.Shape(poly), {amount: 0}));
         } else {

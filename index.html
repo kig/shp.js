@@ -12,16 +12,21 @@
           var m = (new THREE.SHPLoader()).createModel(parsedShp, true);
           console.log('created model', m);
           var r = new THREE.WebGLRenderer();
-          r.setSize(1000,500);
+          r.setSize(500,500);
           document.body.appendChild(r.domElement);
           var s = new THREE.Scene();
           s.add(m);
-          var c = new THREE.PerspectiveCamera(75, 1/0.5, 1, 10000);
-          c.position.z = 200;
+          var c = new THREE.PerspectiveCamera(45, 1, 1, 10000);
+          c.position.z = 500;
+          c.position.y = 200;
           s.add(c);
+          var t0 = new Date;
           var animate = function(t) {
-            var dt = 16;
+            var dt = t-t0;
+            t0 = t;
             m.rotation.y += 0.002 * dt;
+            m.position.y = Math.abs(Math.sin(t / 500)) * 200 - 100;
+            c.lookAt(new THREE.Vector3(0,0,0));
             r.render(s, c);
             requestAnimationFrame(animate);
           }
