@@ -145,7 +145,6 @@ p.createModel = function(shp, spherize) {
       var points = r.content.points;
       var parts = r.content.parts;
       var poly = [];
-      poly.push(new THREE.Vector2(x, y));
       for (var k=0; k<parts.length; k++) {
         poly = [];
         for (var j=parts[k], last=parts[k+1]||(points.length/2); j<last; j++) {
@@ -188,5 +187,73 @@ p.createModel = function(shp, spherize) {
       new THREE.MeshBasicMaterial({color: 0x88ff44, wireframe: true})
     ));
   }
+  console.log('parsed', polys.length, lines.length);
   return model;
+};
+
+p.loadCompressed = function(compressed, spherize) {
+  var polys = [];
+  var lines = [];
+  var poly = [];
+  for (var i=0; i<compressed.length; i++) {
+    if (compressed[i] === -32768) {
+      console.log('new polyline', poly.length);
+      var geo = new THREE.Geometry();
+      geo.vertices = poly;
+      lines.push(geo);
+      poly = [];
+      continue;
+    }
+    var x = compressed[i] * 180 / 32767;
+    var y = compressed[i+1] * 180 / 32767;
+    i++;
+    if (spherize) {
+      var a = -x/180*Math.PI;
+      var t = y/180*Math.PI;
+      y = Math.sin(t) * 90;
+      x = Math.cos(a) * 90 * Math.cos(t);
+      var z = Math.sin(a) * 90 * Math.cos(t);
+      poly.push(new THREE.Vector3(x, y, z));
+    } else {
+      poly.push(new THREE.Vector3(x, y, 0));
+    }
+  }
+  var model = new THREE.Object3D();
+  for (var i=0; i<lines.length; i++) {
+    model.add(new THREE.Line(
+      lines[i],
+      new THREE.LineBasicMaterial({color: 'black', lineWidth: 2}),
+      THREE.LineStrip
+    ));
+  }
+  for (var i=0; i<polys.length; i++) {
+    model.add(new THREE.Mesh(
+      polys[i],
+      new THREE.MeshBasicMaterial({color: 0x88ff44, wireframe: true})
+    ));
+  }
+  console.log('parsed compressed', polys.length, lines.length);
+  return model;
+};
+
+p.compress = function(shp) {
+  var polys = [];
+  for (var i=0; i<shp.records.length; i++) {
+    var r = shp.records[i].shape;
+    if (r.type === SHP.POLYGON) {
+      var points = r.content.points;
+      var parts = r.content.parts;
+      for (var k=0; k<parts.length; k++) {
+        for (var j=parts[k], last=parts[k+1]||(points.length/2); j<last; j++) {
+          var x = points[j*2];
+          var y = points[j*2+1];
+          polys.push(x / 180 * 32767, y / 180 * 32767);
+        }
+        polys.push(-32768);
+      }
+    }
+  }
+  var i16a = new Int16Array(polys);
+  console.log(polys, i16a);
+  return i16a;
 };

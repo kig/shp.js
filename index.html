@@ -4,18 +4,38 @@
     <script src="http://mrdoob.github.com/three.js/build/Three.js"></script>
     <script src="shp.js"></script>
     <script>
+      function save(buffer, name, mimetype) {
+        var bb = new WebKitBlobBuilder();
+        bb.append(buffer);
+        var b = bb.getBlob();
+        var url = webkitURL.createObjectURL(b);
+        var a = document.createElement('a');
+        a.download = name;
+        a.mimetype = mimetype;
+        a.href = url;
+        a.click();
+        webkitURL.revokeObjectURL(url);
+      }
+    </script>
+    <script>
       parsedShp = null;
       SHPParser.load('110m_land.shp', 
         function(res) {
           console.log('ok', res);
           parsedShp = res;
-          var m = (new THREE.SHPLoader()).createModel(parsedShp, true);
+          var loader = new THREE.SHPLoader();
+          var m = loader.createModel(parsedShp, true);
           console.log('created model', m);
+          var compressed = loader.compress(parsedShp);
+          //save(compressed.buffer, '110m_land.i16a')
+          console.log('16-bit quantized size', compressed.buffer.byteLength);
+          var n = loader.loadCompressed(compressed, true);
           var r = new THREE.WebGLRenderer();
           r.setSize(500,500);
           document.body.appendChild(r.domElement);
           var s = new THREE.Scene();
           s.add(m);
+          s.add(n);
           var c = new THREE.PerspectiveCamera(45, 1, 1, 10000);
           c.position.z = 500;
           c.position.y = 200;
@@ -25,6 +45,7 @@
             var dt = t-t0;
             t0 = t;
             m.rotation.y += 0.002 * dt;
+            n.rotation.y += 0.002 * dt;
             m.position.y = Math.abs(Math.sin(t / 500)) * 200 - 100;
             c.lookAt(new THREE.Vector3(0,0,0));
             r.render(s, c);
