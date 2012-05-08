@@ -1,0 +1,37 @@
+<!doctype html>
+<html>
+  <head>
+    <script src="http://mrdoob.github.com/three.js/build/Three.js"></script>
+    <script src="shp.js"></script>
+    <script>
+      parsedShp = null;
+      SHPParser.load('110m_land.shp', 
+        function(res) {
+          console.log('ok', res);
+          parsedShp = res;
+          var m = (new THREE.SHPLoader()).createModel(parsedShp, true);
+          console.log('created model', m);
+          var r = new THREE.WebGLRenderer();
+          r.setSize(1000,500);
+          document.body.appendChild(r.domElement);
+          var s = new THREE.Scene();
+          s.add(m);
+          var c = new THREE.PerspectiveCamera(75, 1/0.5, 1, 10000);
+          c.position.z = 200;
+          s.add(c);
+          var animate = function(t) {
+            var dt = 16;
+            m.rotation.y += 0.002 * dt;
+            r.render(s, c);
+            requestAnimationFrame(animate);
+          }
+          requestAnimationFrame(animate);
+        },
+        function(res){ console.log('error', res); }
+      );
+    </script>
+  </head>
+  <body>
+  </body>
+
+</html>
