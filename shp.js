@@ -192,7 +192,7 @@ p.createModel = function(shp, spherize) {
 };
 
 p.loadCompressed = function(deltaEncoded, spherize) {
-  var compressed = this.deltaDecode(deltaEncoded);
+  var compressed = this.deltaDecode6(deltaEncoded);
   var polys = [];
   var lines = [];
   var poly = [];
@@ -255,7 +255,7 @@ p.compress = function(shp) {
   }
   var i16a = new Int16Array(polys);
   console.log('16-bit quantized byteLength', i16a.buffer.byteLength);
-  var denc = this.deltaEncode(i16a);
+  var denc = this.deltaEncode6(i16a);
   console.log('delta-encoded byteLength', denc.byteLength);
   return denc;
 };
@@ -296,6 +296,52 @@ p.deltaEncode = function(arr) {
       i++;
     }
   }
+  return this.storeDeltas(byteLen, polys);
+};
+
+p.deltaEncode6 = function(arr) {
+  var polys = [];
+  var spans = [];
+  var span = [];
+  var x = 0, y = 0, i=0;
+  var byteLen = 0;
+  for (i=0; i<arr.length; i++) {
+    arr[i] = 0 | (arr[i] / 16);
+  }
+  for (i=0; i<arr.length; i++) {
+    if (arr[i] === -2048) {
+      spans.push(span);
+      polys.push(spans);
+      spans = [];
+      span = [];
+      byteLen += 3;
+      continue;
+    }
+    if (span.length == 0) {
+      x = arr[i], y = arr[i+1];
+      span.push(x, y);
+      byteLen += 4;
+      i++;
+    } else if (Math.abs(x - arr[i]) > 31 || Math.abs(y - arr[i+1]) > 31) {
+      spans.push(span);
+      byteLen += 1;
+      span = [];
+      x = arr[i], y = arr[i+1];
+      span.push(x, y);
+      byteLen += 4;
+      i++;
+    } else {
+      span.push((arr[i] - x), (arr[i+1] - y));
+      x += (arr[i] - x);
+      y += (arr[i+1] - y);
+      byteLen += 2;
+      i++;
+    }
+  }
+  return this.storeDeltas6(byteLen, polys);
+};
+
+p.storeDeltas = function(byteLen, polys) { 
   var buf = new ArrayBuffer(byteLen);
   var dv = new DataView(buf);
   var idx = 0;
@@ -345,6 +391,67 @@ p.deltaDecode = function(buf) {
       y += dy * 8;
       polys.push(x, y);
     }
+  }
+  return polys;
+};
+
+
+p.storeDeltas6 = function(byteLen, polys) { 
+  var buf = new ArrayBuffer(Math.ceil(byteLen * 0.75)+4);
+  var dv = new BitView(buf);
+  var idx = 32;
+  for (var i=0; i<polys.length; i++) {
+    var spans = polys[i];
+    for (var j=0; j<spans.length; j++) {
+      var span = spans[j];
+      dv.setInt12(idx, span[0]);
+      idx += 12;
+      dv.setInt12(idx, span[1]);
+      idx += 12;
+      for (var k=2; k<span.length; k++) {
+        dv.setInt6(idx, span[k]);
+        idx += 6;
+      }
+      dv.setInt6(idx, -32);
+      idx += 6;
+    }
+    dv.setInt12(idx, -2048);
+    idx += 12;
+  }
+  new DataView(buf).setUint32(0, idx);
+  return buf;
+};
+
+p.deltaDecode6 = function(buf) {
+  var bitLength = new DataView(buf).getUint32(0);
+  var dv = new BitView(buf);
+  var idx = 32;
+  var polys = [];
+  while (idx < bitLength) {
+    var x = dv.getInt12(idx);
+    idx += 12;
+    if (x === -2048) {
+      polys.push(-2048);
+      continue;
+    }
+    var y = dv.getInt12(idx);
+    idx += 12;
+    polys.push(x, y);
+    while (idx < bitLength) {
+      var dx = dv.getInt6(idx);
+      idx += 6;
+      if (dx === -32) {
+        break;
+      }
+      var dy = dv.getInt6(idx);
+      idx += 6;
+      x += dx;
+      y += dy;
+      polys.push(x, y);
+    }
+  }
+  for (var i=0; i<polys.length; i++) {
+    polys[i] *= 16;
   }
   return polys;
 };
