@@ -207,8 +207,9 @@ p.loadCompressed = function(deltaEncoded, spherize) {
       }
       var shape = new THREE.Shape(p);
       var geo = shape.extrude({amount: 0.001, bevelThickness: 0.001, bevelSize: 0.001, bevelEnabled: false, curveSegments: 1});
-      if (false && spherize) {
+      if (spherize) {
         var k;
+        /*
         var verts = [];
         var vs = geo.vertices;
         for (k=0; k<geo.faces.length; k++) {
@@ -220,13 +221,17 @@ p.loadCompressed = function(deltaEncoded, spherize) {
         for (k=0; k<verts.length; k+=3) {
           geo.faces.push(new THREE.Face3(k, k+1, k+2));
         }
+        */
         for (k=0; k<geo.vertices.length; k++) {
           var v = geo.vertices[k];
           var a = -v.x/180*Math.PI;
           var t = v.y/180*Math.PI;
-          v.y = Math.sin(t) * 90;
-          v.x = Math.cos(a) * 90 * Math.cos(t);
-          v.z = Math.sin(a) * 90 * Math.cos(t);
+          v.y = Math.sin(t);
+          v.x = Math.cos(a) * Math.cos(t);
+          v.z = Math.sin(a) * Math.cos(t);
+        }
+        for (k=0; k<geo.vertices.length; k++) {
+          geo.vertices[k].setLength(90);
         }
       }
       polys.push(geo);

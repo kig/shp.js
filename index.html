@@ -38,10 +38,10 @@
           r.setSize(1400,1400);
           document.body.appendChild(r.domElement);
           var s = new THREE.Scene();
-          /*s.add(new THREE.Mesh(
+          s.add(new THREE.Mesh(
             new THREE.SphereGeometry(88,64, 64),
-            new THREE.MeshBasicMaterial({color: 0x0000FF})
-          ));*/
+            new THREE.MeshBasicMaterial({color: 0x0000FF, opacity: 0.3, depthWrite:false})
+          ));
           s.add(m);
           s.add(n);
           var c = new THREE.PerspectiveCamera(45, 1, 1, 10000);
