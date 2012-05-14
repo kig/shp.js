@@ -30,6 +30,7 @@
           parsedShp = res;
           var loader = new THREE.SHPLoader();
           var m = loader.createModel(parsedShp, true);
+          m.scale.set(1.01, 1.01, 1.01);
           console.log('created model', m);
           var compressed = loader.compress(parsedShp);
           //save(compressed, '110m_land.i12d6')
