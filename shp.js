@@ -1,7 +1,5 @@
 // Shapefile parser, following the specification at
 // http://www.esri.com/library/whitepapers/pdfs/shapefile.pdf
-
-
 SHP = {
   NULL: 0,
   POINT: 1,
@@ -198,25 +196,40 @@ p.loadCompressed = function(deltaEncoded, spherize) {
   var poly = [];
   for (var i=0; i<compressed.length; i++) {
     if (compressed[i] === -32768) {
-      var geo = new THREE.Geometry();
-      geo.vertices = poly;
-      lines.push(geo);
+      // var geo = new THREE.Geometry();
+      // geo.vertices
+      var shape = new THREE.Shape(poly);
+      var geo = shape.extrude({amount: 0.001, bevelThickness: 0.001, bevelSize: 0.001, bevelEnabled: false, curveSegments: 1});
+      if (false && spherize) {
+        var k;
+        var verts = [];
+        var vs = geo.vertices;
+        for (k=0; k<geo.faces.length; k++) {
+          var f = geo.faces[k];
+          verts.push(vs[f.a], vs[f.b], vs[f.c]);
+        }
+        geo = new THREE.Geometry();
+        geo.vertices = verts;
+        for (k=0; k<verts.length; k+=3) {
+          geo.faces.push(new THREE.Face3(k, k+1, k+2));
+        }
+        for (k=0; k<geo.vertices.length; k++) {
+          var v = geo.vertices[k];
+          var a = -v.x/180*Math.PI;
+          var t = v.y/180*Math.PI;
+          v.y = Math.sin(t) * 90;
+          v.x = Math.cos(a) * 90 * Math.cos(t);
+          v.z = Math.sin(a) * 90 * Math.cos(t);
+        }
+      }
+      polys.push(geo);
       poly = [];
       continue;
     }
     var x = compressed[i] * 180 / 32767;
     var y = compressed[i+1] * 180 / 32767;
     i++;
-    if (spherize) {
-      var a = -x/180*Math.PI;
-      var t = y/180*Math.PI;
-      y = Math.sin(t) * 90;
-      x = Math.cos(a) * 90 * Math.cos(t);
-      var z = Math.sin(a) * 90 * Math.cos(t);
-      poly.push(new THREE.Vector3(x, y, z));
-    } else {
-      poly.push(new THREE.Vector3(x, y, 0));
-    }
+    poly.push(new THREE.Vector3(x, y, 0));
   }
   var model = new THREE.Object3D();
   for (var i=0; i<lines.length; i++) {
@@ -229,7 +242,7 @@ p.loadCompressed = function(deltaEncoded, spherize) {
   for (var i=0; i<polys.length; i++) {
     model.add(new THREE.Mesh(
       polys[i],
-      new THREE.MeshBasicMaterial({color: 0x88ff44, wireframe: true})
+      new THREE.MeshBasicMaterial({color: 0x88ff44})
     ));
   }
   console.log('parsed compressed', polys.length, lines.length);

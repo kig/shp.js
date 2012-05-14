@@ -1,7 +1,11 @@
 <!doctype html>
 <html>
   <head>
+<!--
     <script src="http://mrdoob.github.com/three.js/build/Three.js"></script>
+-->
+    <script src="Three.js"></script>
+    <script src="triangulate.js"></script>
     <script src="bitview.js"></script>
     <script src="shp.js"></script>
     <script>
@@ -34,6 +38,10 @@
           r.setSize(1400,1400);
           document.body.appendChild(r.domElement);
           var s = new THREE.Scene();
+          /*s.add(new THREE.Mesh(
+            new THREE.SphereGeometry(88,64, 64),
+            new THREE.MeshBasicMaterial({color: 0x0000FF})
+          ));*/
           s.add(m);
           s.add(n);
           var c = new THREE.PerspectiveCamera(45, 1, 1, 10000);

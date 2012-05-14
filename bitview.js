@@ -3,6 +3,23 @@ BitView = function(buf) {
   this.u8 = new Uint8Array(buf);
 };
 
+BitView.prototype.getBit = function(idx) {
+  var v = this.u8[idx >> 3];
+  var off = idx & 0x7;
+  return (v & (0x80 >> off)) >> (7-off);
+};
+
+BitView.prototype.setBit = function(idx, val) {
+  var bidx = idx >> 3;
+  var v = this.u8[bidx];
+  var off = idx & 0x7;
+  if (val) {
+    this.u8[bidx] = v | (0x80 >> off);
+  } else {
+    this.u8[bidx] = v & ~(0x80 >> off);
+  }
+};
+
 BitView.prototype.getInt12 = function(idx) {
   var bidx = idx/8 | 0;
   var a = this.u8[bidx];
