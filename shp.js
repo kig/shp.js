@@ -161,6 +161,7 @@ p.createModel = function(shp, spherize) {
         }
         if (false && r.type == SHP.POLYGON) {
           //console.log('new polygon', poly.length, points.length/2);
+          poly.pop();
           polys.push(new THREE.ExtrudeGeometry(new THREE.Shape(poly), {amount: 0}));
         } else {
           //console.log('new polyline', poly.length, points.length/2);
@@ -198,7 +199,13 @@ p.loadCompressed = function(deltaEncoded, spherize) {
     if (compressed[i] === -32768) {
       // var geo = new THREE.Geometry();
       // geo.vertices
-      var shape = new THREE.Shape(poly);
+      var p = [];
+      for (var h=1; h<poly.length; h++) {
+        if (!(poly[h-1].x == poly[h].x && poly[h-1].y == poly[h].y)) {
+          p.push(poly[h]);
+        }
+      }
+      var shape = new THREE.Shape(p);
       var geo = shape.extrude({amount: 0.001, bevelThickness: 0.001, bevelSize: 0.001, bevelEnabled: false, curveSegments: 1});
       if (false && spherize) {
         var k;
