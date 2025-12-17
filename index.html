@@ -1,71 +1,192 @@
-<!doctype html>
+<!DOCTYPE html>
 <html>
-  <head>
-<!--
-    <script src="http://mrdoob.github.com/three.js/build/Three.js"></script>
--->
-    <script src="Three.js"></script>
-    <script src="bitview.js"></script>
-    <script src="shp.js"></script>
-    <script src="shp_three.js"></script>
-    <script>
-      function save(buffer, name, mimetype) {
-        var bb = new WebKitBlobBuilder();
-        bb.append(buffer);
-        var b = bb.getBlob();
-        var url = webkitURL.createObjectURL(b);
-        var a = document.createElement('a');
-        a.download = name;
-        a.mimetype = mimetype;
-        a.href = url;
-        a.click();
-        webkitURL.revokeObjectURL(url);
-      }
-    </script>
-    <script>
-      parsedShp = null;
-      SHPParser.load('110m_land.shp', 
-        function(res) {
-          console.log('ok', res);
-          parsedShp = res;
-          var loader = new THREE.SHPLoader();
-          var m = loader.createModel(parsedShp, true);
-          m.scale.set(1.01, 1.01, 1.01);
-          console.log('created model', m);
-          var compressed = loader.compress(parsedShp);
-          //save(compressed, '110m_land.i12d6')
-          var n = loader.loadCompressed(compressed, true);
-          var r = new THREE.WebGLRenderer();
-          r.setSize(1400,1400);
-          document.body.appendChild(r.domElement);
-          var s = new THREE.Scene();
-          s.add(new THREE.Mesh(
-            new THREE.SphereGeometry(88,64, 64),
-            new THREE.MeshBasicMaterial({color: 0x0000FF, opacity: 0.3, depthWrite:false})
-          ));
-          s.add(m);
-          s.add(n);
-          var c = new THREE.PerspectiveCamera(45, 1, 1, 10000);
-          c.position.z = 500;
-          c.position.y = 200;
-          s.add(c);
-          var t0 = new Date;
-          var animate = function(t) {
-            var dt = t-t0;
-            t0 = t;
-            m.rotation.y += 0.0001 * dt;
-            n.rotation.y += 0.0001 * dt;
-            c.lookAt(new THREE.Vector3(0,0,0));
-            r.render(s, c);
-            requestAnimationFrame(animate);
-          }
-          requestAnimationFrame(animate);
-        },
-        function(res){ console.log('error', res); }
-      );
-    </script>
-  </head>
-  <body>
-  </body>
+    <head>
+        <title>shp-js Demo</title>
+        <style>
+            body {
+                margin: 0;
+                overflow: hidden;
+                cursor: grab;
+            }
+            body.dragging {
+                cursor: grabbing;
+            }
+            canvas {
+                display: block;
+            }
+        </style>
+        <script type="importmap">
+            {
+                "imports": {
+                    "three": "https://unpkg.com/three@0.170.0/build/three.module.js"
+                }
+            }
+        </script>
+        <script type="module">
+            import * as THREE from "three";
+            // Import directly from source files
+            import { SHPParser } from "./src/index.ts";
+            import { SHPLoader } from "./src/three.ts";
+            import { compress } from "./src/SHPCompress.ts"
 
+            async function main() {
+                // Setup renderer
+                const renderer = new THREE.WebGLRenderer({ antialias: true });
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                renderer.setPixelRatio(window.devicePixelRatio);
+                document.body.appendChild(renderer.domElement);
+
+                // Setup scene
+                const scene = new THREE.Scene();
+                scene.background = new THREE.Color(0x111122);
+
+                // Setup camera
+                const camera = new THREE.PerspectiveCamera(
+                    45,
+                    window.innerWidth / window.innerHeight,
+                    1,
+                    10000
+                );
+                camera.position.z = 500;
+                camera.position.y = 200;
+
+                // Add ocean sphere
+                const oceanSphere = new THREE.Mesh(
+                    new THREE.SphereGeometry(88, 64, 64),
+                    new THREE.MeshBasicMaterial({
+                        color: 0x0044aa,
+                        transparent: true,
+                        opacity: 0.8,
+                        depthWrite: false,
+                    })
+                );
+                scene.add(oceanSphere);
+
+                // Load shapefile
+                try {
+                    console.log("Loading shapefile...");
+                    const shapeData = await SHPParser.load("110m_land.shp");
+                    console.log("Shapefile loaded:", shapeData);
+
+                    // Create model with spherical projection
+                    const loader = new SHPLoader();
+                    const landModel = loader.createModel(shapeData, {
+                        spherize: true,
+                        lineColor: 0xff00ff,
+                        meshColor: 0x00ffff,
+                        lineWidth: 2,
+                        outerRadius: 88.8,
+                        innerRadius: 88,
+                    });
+                    scene.add(landModel);
+
+                    // Optional: Create compressed version
+                    const compressed = compress(shapeData);
+                    console.log(
+                        "Compressed size:",
+                        compressed.byteLength,
+                        "bytes"
+                    );
+
+                    const decompressedShapeData =
+                        await SHPParser.loadCompressed("110m_land.shpz");
+
+                    const compressedModel = loader.createModel(
+                        decompressedShapeData,
+                        {
+                            spherize: true,
+                            lineColor: 0xff0000,
+                            meshColor: 0x000000,
+                            lineWidth: 4,
+                            outerRadius: 90,
+                            innerRadius: 89,
+                        }
+                    );
+                    scene.add(compressedModel);
+                } catch (error) {
+                    console.error("Failed to load shapefile:", error);
+                }
+
+                // Mouse drag controls
+                let isDragging = false;
+                let previousMousePosition = { x: 0, y: 0 };
+                let velocity = { x: 0, y: 0 };
+                const damping = 0.95;
+                const dragSensitivity = 0.005;
+
+                renderer.domElement.addEventListener('mousedown', (e) => {
+                    isDragging = true;
+                    document.body.classList.add('dragging');
+                    previousMousePosition = { x: e.clientX, y: e.clientY };
+                    velocity = { x: 0, y: 0 };
+                });
+
+                window.addEventListener('mousemove', (e) => {
+                    if (!isDragging) return;
+
+                    const deltaX = e.clientX - previousMousePosition.x;
+                    const deltaY = e.clientY - previousMousePosition.y;
+
+                    velocity.x = deltaX * dragSensitivity;
+                    velocity.y = deltaY * dragSensitivity;
+
+                    scene.rotation.y += velocity.x;
+                    scene.rotation.x += velocity.y;
+
+                    // Clamp vertical rotation
+                    scene.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, scene.rotation.x));
+
+                    previousMousePosition = { x: e.clientX, y: e.clientY };
+                });
+
+                window.addEventListener('mouseup', () => {
+                    isDragging = false;
+                    document.body.classList.remove('dragging');
+                });
+
+                // Handle window resize
+                window.addEventListener("resize", () => {
+                    camera.aspect = window.innerWidth / window.innerHeight;
+                    camera.updateProjectionMatrix();
+                    renderer.setSize(window.innerWidth, window.innerHeight);
+                });
+
+                // Animation loop
+                let lastTime = performance.now();
+                const autoRotateSpeed = 0.0001; // radians per millisecond
+                function animate(time) {
+                    const dt = time - lastTime;
+                    lastTime = time;
+
+                    // Apply momentum when not dragging
+                    if (!isDragging) {
+                        // Apply velocity with damping
+                        scene.rotation.y += velocity.x;
+                        scene.rotation.x += velocity.y;
+                        
+                        // Clamp vertical rotation
+                        scene.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, scene.rotation.x));
+                        
+                        // Apply damping
+                        velocity.x *= damping;
+                        velocity.y *= damping;
+
+                        // Auto-rotate when velocity is very low
+                        if (Math.abs(velocity.x) < 0.0001 && Math.abs(velocity.y) < 0.0001) {
+                            scene.rotation.y += autoRotateSpeed * dt;
+                        }
+                    }
+
+                    camera.lookAt(0, 0, 0);
+                    renderer.render(scene, camera);
+                    requestAnimationFrame(animate);
+                }
+
+                requestAnimationFrame(animate);
+            }
+
+            main();
+        </script>
+    </head>
+    <body></body>
 </html>
